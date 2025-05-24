@@ -1,0 +1,64 @@
+---
+title: "Interdependence between Short-Term and Long-Term Treasury Yields"
+author: "Aayush Khandekar"
+date: '`December 2nd, 2024'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+
+library(forecast)
+library(tidyverse)
+library(vars)
+
+```
+
+```{r}
+
+data <- read.csv("data.csv")
+
+# Differencing
+data$c1_t <- c(NA, diff(data$DGS1))
+data$c10_t <- c(NA, diff(data$DGS10))
+
+data <- na.omit(data)
+
+# Fit AR models for c1_t
+ar_c1 <- auto.arima(data$c1_t, max.p = 5, max.q = 0, stationary = TRUE)
+summary(ar_c1)
+
+# Fit AR models for c10_t
+ar_c10 <- auto.arima(data$c10_t, max.p = 5, max.q = 0, stationary = TRUE)
+summary(ar_c10)
+
+```
+
+```{r}
+
+# Bivariate autoregressive model for two change series
+change_series <- data.frame(c1_t = data$c1_t, c10_t = data$c10_t)
+
+# Fit a VAR model
+var_model <- VAR(change_series, p = 2, type = "const")  
+summary(var_model)
+
+```
+
+```{r}
+
+Bmat <- matrix(c(NA, 0, NA, NA), nrow = 2, byrow = TRUE)
+
+svar_model <- SVAR(var_model, Bmat = Bmat, estmethod = "scoring")
+summary(svar_model)
+
+```
+
+The VAR model reveals significant interdependencies between $c^1_t$ and $c^{10}_t$.
+
+Specifically, $c^{10}_t$ at lag 1 significantly influences $c^1_t$ ($0.237$, $p = 0.004$), while $c^1_t$ has a negligible effect on $c^{10}_t$ ($-0.009$, $p = 0.817$).
+
+This suggests that long-term rates have a stronger impact on short-term rates, reflecting their persistence over time.
+
+In contrast, the single AR models primarily capture the autocorrelation within each series, such as the significant AR(2) terms for $c^1_t$ ($ar1 = 0.451$, $ar2 = -0.248$) and $c^{10}_t$ ($ar1 = 0.383$, $ar2 = -0.233$, $ar3 = 0.070$), but they miss the cross-series dynamics evident in the VAR model.
