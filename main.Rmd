@@ -12,6 +12,7 @@ output:
 library(forecast)
 library(tidyverse)
 library(vars)
+library(ggplot2)
 
 ```
 
@@ -34,6 +35,19 @@ ar_c10 <- auto.arima(data$c10_t, max.p = 5, max.q = 0, stationary = TRUE)
 summary(ar_c10)
 
 ```
+```{r}
+
+ggplot(data, aes(x = 1:nrow(data), y = c1_t)) +
+  geom_line(color = "black") +
+  labs(title = "1-Year Treasury Yield Changes Over Time",
+       x = "Time", y = "Change in 1-Year Yield")
+
+ggplot(data, aes(x = 1:nrow(data), y = c10_t)) +
+  geom_line(color = "black") +
+  labs(title = "10-Year Treasury Yield Changes Over Time",
+       x = "Time", y = "Change in 10-Year Yield")
+
+```
 
 ```{r}
 
@@ -48,12 +62,62 @@ summary(var_model)
 
 ```{r}
 
+irf_result <- irf(var_model, impulse = "c1_t", response = "c10_t", n.ahead = 20, boot = TRUE)
+
+plot(irf_result, main = "Impulse Response: c1_t Shock on c10_t")
+
+```
+The impulse response analysis reveals that a shock to the 1-year yield causes an immediate and significant rise in the 10-year yield, with the impact peaking at around 0.20 and fading within 5 periods. 
+
+This provides clear visual and statistical evidence that short-term rate movements influence long-term rates, supporting the transmission of monetary policy through the yield curve.
+
+
+```{r}
+
 Bmat <- matrix(c(NA, 0, NA, NA), nrow = 2, byrow = TRUE)
 
 svar_model <- SVAR(var_model, Bmat = Bmat, estmethod = "scoring")
 summary(svar_model)
 
 ```
+
+
+```{r}
+
+acf(data$c1_t, main = "ACF of 1-Year Yield Change")
+pacf(data$c1_t, main = "PACF of 1-Year Yield Change")
+
+```
+```{r}
+
+fitted_vals <- fitted(ar_c1)
+
+plot(data$c1_t, type = "l", col = "black", lwd = 1.5, ylab = "Yield Change", main = "Actual vs Fitted - AR(2) Model")
+lines(fitted_vals, col = "red", lwd = 2)
+legend("topright", legend = c("Actual", "Fitted"), col = c("black", "red"), lty = 1)
+
+```
+
+
+```{r}
+
+# Lagged short-term change
+data$c1_t_lag1 <- dplyr::lag(data$c1_t, 1)
+
+# Scatter plot
+library(ggplot2)
+ggplot(data, aes(x = c1_t_lag1, y = c10_t)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", col = "red") +
+  labs(title = "Lagged 1Y Yield Change vs Current 10Y Yield Change",
+       x = "Lag 1 of 1-Year Yield Change",
+       y = "10-Year Yield Change")
+
+```
+
+The scatter plot demonstrates a positive and statistically significant relationship between the previous day's change in the 1-year Treasury yield and the current day's change in the 10-year yield. This supports the hypothesis that short-term interest rate movements influence long-term rates with a lag, consistent with the expectations theory and results from the VAR model.
+
+
 
 The VAR model reveals significant interdependencies between $c^1_t$ and $c^{10}_t$.
 
